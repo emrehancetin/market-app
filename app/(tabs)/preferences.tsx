@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { usePreferencesStore } from '../../src/stores/preferencesStore';
+import { useSavedRecipesStore } from '../../src/stores/savedRecipesStore';
 
 function ChipList({
   items, onRemove, emptyText,
@@ -52,6 +53,7 @@ function AddInput({ onAdd, placeholder }: { onAdd: (v: string) => void; placehol
 export default function PreferencesScreen() {
   const { neverUse, alwaysHave, addNeverUse, removeNeverUse, addAlwaysHave, removeAlwaysHave } =
     usePreferencesStore();
+  const { recipes, deleteRecipe } = useSavedRecipesStore();
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -91,6 +93,30 @@ export default function PreferencesScreen() {
           <AddInput onAdd={addAlwaysHave} placeholder="Malzeme ekle... (örn: zeytinyağı)" />
         </View>
 
+        {recipes.length > 0 && (
+          <>
+            <View style={styles.divider} />
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="bookmark-outline" size={18} color="#a78bfa" />
+                <Text style={styles.sectionTitle}>Kaydedilmiş Tariflerim</Text>
+              </View>
+              <Text style={styles.sectionDesc}>Silmek için çöp kutusuna dokun.</Text>
+              {recipes.map((r) => (
+                <View key={r.id} style={styles.recipeRow}>
+                  <View style={styles.recipeInfo}>
+                    <Text style={styles.recipeName}>{r.name}</Text>
+                    <Text style={styles.recipeMeta}>{r.ingredients.length} malzeme</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => deleteRecipe(r.id)} style={styles.deleteBtn}>
+                    <Ionicons name="trash-outline" size={16} color="#444" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -126,4 +152,14 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 12,
     backgroundColor: '#4ade80', alignItems: 'center', justifyContent: 'center',
   },
+
+  recipeRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#1a1a1a', borderRadius: 12, padding: 12,
+    borderWidth: 0.5, borderColor: '#2d1f4a',
+  },
+  recipeInfo: { flex: 1, gap: 2 },
+  recipeName: { color: '#e5e5e5', fontSize: 14, fontWeight: '500' },
+  recipeMeta: { color: '#555', fontSize: 12 },
+  deleteBtn: { padding: 6 },
 });
