@@ -147,9 +147,22 @@ export async function fetchCategory(itemName: string): Promise<string> {
   return category;
 }
 
-export async function fetchRecipeIngredients(mealName: string): Promise<RecipeIngredient[]> {
+export async function fetchRecipeIngredients(
+  mealName: string,
+  neverUse: string[],
+  alwaysHave: string[]
+): Promise<RecipeIngredient[]> {
+  const contextLines: string[] = [];
+  if (neverUse.length > 0)
+    contextLines.push(`Kullanıcı şunları KESİNLİKLE KULLANMAZ (diyet/alerji): ${neverUse.join(', ')}.`);
+  if (alwaysHave.length > 0)
+    contextLines.push(`Kullanıcının evde her zaman şunlar var, satın almasına gerek yok: ${alwaysHave.join(', ')}.`);
+
+  const context = contextLines.length > 0 ? '\n' + contextLines.join('\n') : '';
+
   const text = await callGemini(
-    `"${mealName}" yemeği için Türkiye mutfağında tipik olarak kullanılan malzeme listesini oluştur. 4 kişilik porsiyon. Sadece şu JSON formatında döndür, başka hiçbir şey yazma: {"ingredients":[{"name":"malzeme adı","quantity":2,"unit":"adet"}]}. Birimler için şunları kullan: adet, kg, gr, lt, ml, yemek kaşığı, tatlı kaşığı, çay kaşığı, su bardağı, demet, diş, tutam.`
+    `"${mealName}" yemeği için Türkiye mutfağında tipik olarak kullanılan malzeme listesini oluştur. 4 kişilik porsiyon.${context}
+Yukarıdaki kısıtlamaları göz önüne alarak sadece gerçekten gerekli ve kullanıcının satın alması gereken malzemeleri listele. Sadece şu JSON formatında döndür, başka hiçbir şey yazma: {"ingredients":[{"name":"malzeme adı","quantity":2,"unit":"adet"}]}. Birimler: adet, kg, gr, lt, ml, yemek kaşığı, tatlı kaşığı, çay kaşığı, su bardağı, demet, diş, tutam.`
   );
 
   const codeBlock = text.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);

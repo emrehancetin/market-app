@@ -4,14 +4,14 @@ import {
   ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 import { fetchRecipeIngredients } from '../../src/lib/gemini';
 import { useListStore } from '../../src/stores/listStore';
 import { usePreferencesStore } from '../../src/stores/preferencesStore';
 import { RecipeIngredient } from '../../src/types';
 
-function matches(ingredient: string, preference: string): boolean {
-  return ingredient.toLowerCase().includes(preference.toLowerCase()) ||
-    preference.toLowerCase().includes(ingredient.toLowerCase());
+interface IngredientRow extends RecipeIngredient {
+  selected: boolean;
 }
 
 export default function CookScreen() {
@@ -19,30 +19,45 @@ export default function CookScreen() {
   const { neverUse, alwaysHave } = usePreferencesStore();
 
   const [mealName, setMealName] = useState('');
+  const [isListening, setIsListening] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [ingredients, setIngredients] = useState<RecipeIngredient[]>([]);
+  const [rows, setRows] = useState<IngredientRow[]>([]);
   const [added, setAdded] = useState(false);
+
+  useSpeechRecognitionEvent('result', (e) => {
+    const text = e.results[0]?.transcript ?? '';
+    if (text) {
+      setMealName(text);
+      if (e.isFinal) {
+        setIsListening(false);
+        ExpoSpeechRecognitionModule.stop();
+      }
+    }
+  });
+  useSpeechRecognitionEvent('end', () => setIsListening(false));
+  useSpeechRecognitionEvent('error', () => setIsListening(false));
+
+  const toggleListening = async () => {
+    if (isListening) { ExpoSpeechRecognitionModule.stop(); return; }
+    const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+    if (!granted) return;
+    setMealName('');
+    setRows([]);
+    setIsListening(true);
+    ExpoSpeechRecognitionModule.start({ lang: 'tr-TR', interimResults: true });
+  };
 
   const handleFetch = async () => {
     if (!mealName.trim()) return;
     setLoading(true);
     setError(null);
-    setIngredients([]);
+    setRows([]);
     setAdded(false);
 
     try {
-      const raw = await fetchRecipeIngredients(mealName.trim());
-
-      const filtered = raw.map((ing) => {
-        if (neverUse.some((p) => matches(ing.name, p)))
-          return { ...ing, filteredReason: 'neverUse' as const };
-        if (alwaysHave.some((p) => matches(ing.name, p)))
-          return { ...ing, filteredReason: 'alwaysHave' as const };
-        return ing;
-      });
-
-      setIngredients(filtered);
+      const ingredients = await fetchRecipeIngredients(mealName.trim(), neverUse, alwaysHave);
+      setRows(ingredients.map((ing) => ({ ...ing, selected: true })));
     } catch (e: any) {
       setError(e.message ?? 'Hata oluştu');
     } finally {
@@ -50,16 +65,24 @@ export default function CookScreen() {
     }
   };
 
+  const toggle = (i: number) =>
+    setRows((prev) => prev.map((r, idx) => idx === i ? { ...r, selected: !r.selected } : r));
+
   const handleAdd = () => {
-    const toAdd = ingredients.filter((i) => !i.filteredReason);
-    toAdd.forEach((ing) => {
-      const id = Date.now().toString() + Math.random();
-      addItem({ name: ing.name, quantity: ing.quantity, unit: ing.unit, note: '', category: 'Genel', id });
+    rows.filter((r) => r.selected).forEach((ing) => {
+      addItem({
+        id: Date.now().toString() + Math.random(),
+        name: ing.name,
+        quantity: ing.quantity,
+        unit: ing.unit,
+        note: '',
+        category: 'Genel',
+      });
     });
     setAdded(true);
   };
 
-  const activeCount = ingredients.filter((i) => !i.filteredReason).length;
+  const selectedCount = rows.filter((r) => r.selected).length;
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -72,12 +95,18 @@ export default function CookScreen() {
             placeholder="örn: tavuk sote, mercimek çorbası..."
             placeholderTextColor="#444"
             value={mealName}
-            onChangeText={(t) => { setMealName(t); setIngredients([]); setAdded(false); }}
+            onChangeText={(t) => { setMealName(t); setRows([]); setAdded(false); }}
             onSubmitEditing={handleFetch}
             returnKeyType="done"
           />
           <TouchableOpacity
-            style={[styles.fetchBtn, !mealName.trim() && styles.fetchBtnDisabled]}
+            style={[styles.iconBtn, isListening && styles.iconBtnRed]}
+            onPress={toggleListening}
+          >
+            <Ionicons name={isListening ? 'stop' : 'mic'} size={18} color="#000" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.iconBtn, styles.iconBtnGreen, (!mealName.trim() || loading) && styles.iconBtnDisabled]}
             onPress={handleFetch}
             disabled={!mealName.trim() || loading}
           >
@@ -89,54 +118,49 @@ export default function CookScreen() {
 
         {error && <Text style={styles.error}>{error}</Text>}
 
-        {ingredients.length > 0 && (
+        {rows.length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>{mealName} — Malzemeler</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{mealName}</Text>
+              <Text style={styles.sectionHint}>Listeye eklemek istemediklerine dokun</Text>
+            </View>
 
-            {ingredients.map((ing, i) => {
-              const filtered = !!ing.filteredReason;
-              return (
-                <View key={i} style={[styles.ingRow, filtered && styles.ingRowFiltered]}>
-                  <Ionicons
-                    name={filtered ? 'close-circle-outline' : 'checkmark-circle-outline'}
-                    size={18}
-                    color={filtered ? '#555' : '#4ade80'}
-                  />
-                  <View style={styles.ingInfo}>
-                    <Text style={[styles.ingName, filtered && styles.ingNameFiltered]}>
-                      {ing.name}
-                    </Text>
-                    <Text style={[styles.ingQty, filtered && styles.ingNameFiltered]}>
-                      {ing.quantity} {ing.unit}
-                    </Text>
-                  </View>
-                  {ing.filteredReason && (
-                    <View style={[styles.badge,
-                      ing.filteredReason === 'neverUse' ? styles.badgeNever : styles.badgeHave]}>
-                      <Text style={styles.badgeText}>
-                        {ing.filteredReason === 'neverUse' ? 'Kullanmıyorsun' : 'Evde var'}
-                      </Text>
-                    </View>
-                  )}
+            {rows.map((row, i) => (
+              <TouchableOpacity
+                key={i}
+                style={[styles.ingRow, !row.selected && styles.ingRowOff]}
+                onPress={() => toggle(i)}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={row.selected ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={20}
+                  color={row.selected ? '#4ade80' : '#333'}
+                />
+                <View style={styles.ingInfo}>
+                  <Text style={[styles.ingName, !row.selected && styles.ingNameOff]}>
+                    {row.name}
+                  </Text>
+                  <Text style={[styles.ingQty, !row.selected && styles.ingNameOff]}>
+                    {row.quantity} {row.unit}
+                  </Text>
                 </View>
-              );
-            })}
+              </TouchableOpacity>
+            ))}
 
             {!added ? (
               <TouchableOpacity
-                style={[styles.addBtn, activeCount === 0 && styles.addBtnDisabled]}
+                style={[styles.addBtn, selectedCount === 0 && styles.addBtnDisabled]}
                 onPress={handleAdd}
-                disabled={activeCount === 0}
+                disabled={selectedCount === 0}
               >
                 <Ionicons name="cart-outline" size={18} color="#000" />
-                <Text style={styles.addBtnText}>
-                  {activeCount} ürünü listeye ekle
-                </Text>
+                <Text style={styles.addBtnText}>{selectedCount} ürünü listeye ekle</Text>
               </TouchableOpacity>
             ) : (
               <View style={styles.successRow}>
                 <Ionicons name="checkmark-circle" size={20} color="#4ade80" />
-                <Text style={styles.successText}>Liste ekle!</Text>
+                <Text style={styles.successText}>Listeye eklendi!</Text>
               </View>
             )}
           </>
@@ -151,43 +175,43 @@ const styles = StyleSheet.create({
   scroll: { padding: 20, paddingTop: 12, gap: 12 },
 
   label: { color: '#e5e5e5', fontSize: 17, fontWeight: '600', marginBottom: 4 },
-  inputRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  inputRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   input: {
     flex: 1, backgroundColor: '#1a1a1a', borderRadius: 12, padding: 14,
     color: '#e5e5e5', fontSize: 15, borderWidth: 0.5, borderColor: '#2a2a2a',
   },
-  fetchBtn: {
+  iconBtn: {
     width: 46, height: 46, borderRadius: 14,
-    backgroundColor: '#4ade80', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#1a1a1a', alignItems: 'center', justifyContent: 'center',
   },
-  fetchBtnDisabled: { backgroundColor: '#1a1a1a' },
+  iconBtnRed: { backgroundColor: '#ef4444' },
+  iconBtnGreen: { backgroundColor: '#4ade80' },
+  iconBtnDisabled: { backgroundColor: '#1a1a1a', opacity: 0.4 },
+
   error: { color: '#f87171', fontSize: 13 },
 
-  sectionTitle: { color: '#555', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, marginTop: 8 },
+  sectionHeader: { marginTop: 8, gap: 2 },
+  sectionTitle: { color: '#e5e5e5', fontSize: 15, fontWeight: '600' },
+  sectionHint: { color: '#444', fontSize: 12 },
 
   ingRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: '#1a1a1a', borderRadius: 12, padding: 12,
     borderWidth: 0.5, borderColor: '#222',
   },
-  ingRowFiltered: { opacity: 0.45 },
+  ingRowOff: { opacity: 0.4 },
   ingInfo: { flex: 1 },
   ingName: { color: '#e5e5e5', fontSize: 15 },
-  ingNameFiltered: { color: '#555' },
+  ingNameOff: { color: '#555' },
   ingQty: { color: '#555', fontSize: 12, marginTop: 2 },
-
-  badge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  badgeNever: { backgroundColor: '#2d1515' },
-  badgeHave: { backgroundColor: '#1a2d1a' },
-  badgeText: { color: '#888', fontSize: 11 },
 
   addBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: '#4ade80', borderRadius: 14, padding: 15, marginTop: 8,
+    backgroundColor: '#4ade80', borderRadius: 14, padding: 15, marginTop: 4,
   },
-  addBtnDisabled: { backgroundColor: '#1a1a1a' },
+  addBtnDisabled: { backgroundColor: '#1a2a1a', opacity: 0.4 },
   addBtnText: { color: '#000', fontWeight: '700', fontSize: 15 },
 
-  successRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8 },
+  successRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4 },
   successText: { color: '#4ade80', fontSize: 15, fontWeight: '600' },
 });
