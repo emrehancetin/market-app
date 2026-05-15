@@ -39,16 +39,29 @@ export const CATEGORIES = [
 
 const categoryCache = new Map<string, string>();
 
+const CATEGORY_PROMPT = `Bir market ürününün kategorisini belirle. Aşağıdaki listeden SADECE BİRİNİ yaz, başka hiçbir şey yazma:
+
+Meyve & Sebze → elma, armut, muz, domates, salatalık, biber, maydanoz, soğan, patates, ıspanak
+Süt & Kahvaltı → süt, yoğurt, peynir, tereyağı, yumurta, reçel, bal, zeytin, labne, kaşar
+Et & Tavuk → tavuk, dana, kuzu, kıyma, balık, sucuk, salam, sosis, karides, hindi
+Ekmek & Fırın → ekmek, simit, pide, poğaça, börek, pasta, kek, kruvasan
+İçecekler → su, çay, kahve, meyve suyu, kola, maden suyu, ayran, bira, limonata
+Temel Gıda → un, şeker, tuz, pirinç, makarna, yağ, salça, baharat, konserve, mercimek, nohut
+Temizlik → deterjan, çamaşır suyu, tuvalet kağıdı, çöp torbası, sünger, bulaşık deterjanı
+Kişisel Bakım → şampuan, sabun, diş macunu, deodorant, krem, traş köpüğü
+Dondurulmuş → dondurma, dondurulmuş sebze, dondurulmuş pizza, donmuş ürün
+Atıştırmalık → cips, çikolata, bisküvi, gofret, kuruyemiş, fındık, kraker
+
+Ürün: "`;
+
 export async function fetchCategory(itemName: string): Promise<string> {
   const key = itemName.toLowerCase();
   if (categoryCache.has(key)) return categoryCache.get(key)!;
 
-  const list = CATEGORIES.join(', ');
-  const text = await callGemini(
-    `"${itemName}" ürünü Türkiye marketlerinde hangi kategoriye girer? Sadece şu listeden birini yaz, başka hiçbir şey yazma: ${list}`
+  const text = await callGemini(CATEGORY_PROMPT + itemName + `"`);
+  const match = CATEGORIES.find((c) =>
+    text.trim().toLowerCase().includes(c.toLowerCase())
   );
-
-  const match = CATEGORIES.find((c) => text.trim().startsWith(c));
   const category = match ?? 'Genel';
   categoryCache.set(key, category);
   return category;
