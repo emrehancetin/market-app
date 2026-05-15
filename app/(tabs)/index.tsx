@@ -67,6 +67,7 @@ export default function HomeScreen() {
     deleteItem,
     updateNote,
     setProductInfo,
+    saveCurrentList,
   } = useListStore();
   const [inputText, setInputText] = useState("");
   const [selectedItem, setSelectedItem] = useState<ListItem | null>(null);
@@ -202,7 +203,15 @@ export default function HomeScreen() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>{currentList.name}</Text>
+        <View style={styles.headerTop}>
+          <Text style={styles.title}>{currentList.name}</Text>
+          {totalCount > 0 && (
+            <TouchableOpacity style={styles.saveBtn} onPress={saveCurrentList}>
+              <Ionicons name="archive-outline" size={16} color="#000" />
+              <Text style={styles.saveBtnText}>Save</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         <Text style={styles.subtitle}>
           {totalCount === 0
             ? "Liste boş, ürün ekle"
@@ -420,8 +429,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0f0f0f" },
 
   header: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 12 },
+  headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   title: { color: "#fff", fontSize: 22, fontWeight: "600" },
   subtitle: { color: "#555", fontSize: 13, marginTop: 2 },
+  saveBtn: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    backgroundColor: "#4ade80", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6,
+  },
+  saveBtnText: { color: "#000", fontSize: 13, fontWeight: "600" },
 
   emptyContainer: {
     flex: 1,
