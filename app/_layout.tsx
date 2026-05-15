@@ -1,37 +1,35 @@
-import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { useEffect } from 'react';
+import { Stack, useRouter, useSegments } from 'expo-router';
+import { supabase } from '../src/lib/supabase';
+import { useAuthStore } from '../src/stores/authStore';
+import { useListStore } from '../src/stores/listStore';
 
 export default function RootLayout() {
+  const { session, loading, setSession } = useAuthStore();
+  const { syncFromCloud } = useListStore();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setSession(session);
+      if (session) syncFromCloud();
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    const inAuth = segments[0] === 'login';
+    if (!session && !inAuth) router.replace('/login');
+    else if (session && inAuth) router.replace('/(tabs)');
+  }, [session, loading, segments]);
+
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: '#0f0f0f',
-          borderTopColor: '#1e1e1e',
-        },
-        tabBarActiveTintColor: '#4ade80',
-        tabBarInactiveTintColor: '#555',
-      }}
-    >
-      <Tabs.Screen
-        name="(tabs)/index"
-        options={{
-          title: 'Liste',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="list" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="(tabs)/history"
-        options={{
-          title: 'Geçmiş',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="time-outline" size={size} color={color} />
-          ),
-        }}
-      />
-    </Tabs>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="login" />
+      <Stack.Screen name="(tabs)" />
+    </Stack>
   );
 }
