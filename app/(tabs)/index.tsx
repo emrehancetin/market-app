@@ -140,24 +140,31 @@ export default function HomeScreen() {
   const totalCount = currentList.items.length;
 
   const handleAdd = () => {
-    const text = inputText.trim();
-    if (!text) return;
+    const raw = inputText.trim();
+    if (!raw) return;
     setInputText("");
 
-    const units = [
-      "kg",
-      "gr",
-      "g",
-      "lt",
-      "litre",
-      "ml",
-      "adet",
-      "paket",
-      "şişe",
-      "kutu",
-      "demet",
-      "tane",
-    ];
+    const unitWords: Record<string, string> = {
+      kilo: "kg", kilogram: "kg", kilogramm: "kg",
+      gram: "gr", gramm: "gr",
+      litre: "lt", liter: "lt", litr: "lt",
+      mililitre: "ml", mililitres: "ml",
+      şişeler: "şişe", kutular: "kutu", paketler: "paket",
+      demetler: "demet", taneler: "tane",
+    };
+
+    const numberWords: Record<string, string> = {
+      yarım: "0.5", çeyrek: "0.25",
+      bir: "1", iki: "2", üç: "3", dört: "4", beş: "5",
+      altı: "6", yedi: "7", sekiz: "8", dokuz: "9", on: "10",
+    };
+
+    const text = raw
+      .split(" ")
+      .map((w) => numberWords[w.toLowerCase()] ?? unitWords[w.toLowerCase()] ?? w)
+      .join(" ");
+
+    const units = ["kg", "gr", "g", "lt", "ml", "adet", "paket", "şişe", "kutu", "demet", "tane"];
     const unitPattern = units.join("|");
 
     // "2kg elma", "2 kg elma", "elma 2kg", "elma 2 kg" hepsini yakala
