@@ -7,11 +7,12 @@ import { supabase } from '../lib/supabase';
 interface ListStore {
   currentList: ShoppingList;
   savedLists: ShoppingList[];
-  addItem: (item: Omit<ListItem, 'id' | 'checked'>) => void;
+  addItem: (item: Omit<ListItem, 'id' | 'checked'> & { id?: string }) => void;
   toggleItem: (id: string) => void;
   deleteItem: (id: string) => void;
   updateNote: (id: string, note: string) => void;
   setProductInfo: (id: string, info: ProductInfo) => void;
+  setCategory: (id: string, category: string) => void;
   saveCurrentList: () => void;
   loadList: (id: string) => void;
   cloneList: (id: string) => void;
@@ -66,7 +67,7 @@ export const useListStore = create<ListStore>()(
             ...state.currentList,
             items: [
               ...state.currentList.items,
-              { ...item, id: Date.now().toString(), checked: false },
+              { ...item, id: item.id ?? Date.now().toString(), checked: false },
             ],
           },
         })),
@@ -105,6 +106,16 @@ export const useListStore = create<ListStore>()(
             ...state.currentList,
             items: state.currentList.items.map((item) =>
               item.id === id ? { ...item, productInfo: info } : item
+            ),
+          },
+        })),
+
+      setCategory: (id, category) =>
+        set((state) => ({
+          currentList: {
+            ...state.currentList,
+            items: state.currentList.items.map((item) =>
+              item.id === id ? { ...item, category } : item
             ),
           },
         })),

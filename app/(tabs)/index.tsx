@@ -20,47 +20,7 @@ import {
 } from "expo-speech-recognition";
 import { useListStore } from "../../src/stores/listStore";
 import { ListItem, ProductInfo } from "../../src/types";
-
-async function fetchProductInfo(itemName: string): Promise<ProductInfo> {
-  const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-  if (!apiKey) throw new Error("API anahtarı bulunamadı");
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: `Türkiye'deki büyük marketlerde (Migros, CarrefourSA, A101, BİM, Şok) "${itemName}" ürününün hangi bölümde olduğunu, o bölümde yakınında yer alan 3-4 ürünü ve alırken dikkat edilmesi gereken kısa bir ipucunu söyle. Sadece şu JSON formatında cevap ver, başka hiçbir şey yazma: {"section":"bölüm adı","nearbyProducts":["ürün1","ürün2","ürün3"],"tips":"ipucu"}`,
-              },
-            ],
-          },
-        ],
-        generationConfig: { maxOutputTokens: 512, thinkingConfig: { thinkingBudget: 0 } },
-      }),
-    },
-  );
-
-  if (!response.ok) throw new Error(`API hatası: ${response.status}`);
-
-  const data = await response.json();
-  const text: string = data.candidates[0].content.parts[0].text;
-  const codeBlock = text.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
-  const jsonStr = codeBlock ? codeBlock[1] : text.match(/\{[\s\S]*\}/)?.[0];
-  if (!jsonStr) throw new Error("Geçersiz API cevabı");
-
-  const parsed = JSON.parse(jsonStr);
-  return {
-    section: parsed.section,
-    nearbyProducts: parsed.nearbyProducts,
-    tips: parsed.tips,
-    fromCache: false,
-  };
-}
+import { fetchProductInfo, fetchCategory } from "../../src/lib/gemini";
 
 export default function HomeScreen() {
   const [isFocused, setIsFocused] = useState(false);
@@ -98,6 +58,7 @@ export default function HomeScreen() {
     deleteItem,
     updateNote,
     setProductInfo,
+    setCategory,
     saveCurrentList,
   } = useListStore();
   const [inputText, setInputText] = useState("");
@@ -199,13 +160,11 @@ export default function HomeScreen() {
     // İlk harfi büyüt
     name = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
 
-    addItem({
-      name,
-      quantity,
-      unit,
-      note: "",
-      category: "Genel",
-    });
+    const id = Date.now().toString();
+    addItem({ name, quantity, unit, note: "", category: "Genel", id });
+    fetchCategory(name)
+      .then((category) => setCategory(id, category))
+      .catch(() => {});
   };
 
   const openNoteModal = (item: ListItem) => {
