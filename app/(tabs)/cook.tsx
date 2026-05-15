@@ -12,10 +12,16 @@ import { RecipeIngredient } from '../../src/types';
 
 interface IngredientRow extends RecipeIngredient {
   selected: boolean;
+  inList: boolean;
+}
+
+function alreadyInList(ingName: string, listNames: string[]): boolean {
+  const a = ingName.toLowerCase();
+  return listNames.some((b) => a.includes(b) || b.includes(a));
 }
 
 export default function CookScreen() {
-  const { addItem } = useListStore();
+  const { addItem, currentList } = useListStore();
   const { neverUse, alwaysHave } = usePreferencesStore();
 
   const [mealName, setMealName] = useState('');
@@ -57,7 +63,11 @@ export default function CookScreen() {
 
     try {
       const ingredients = await fetchRecipeIngredients(mealName.trim(), neverUse, alwaysHave);
-      setRows(ingredients.map((ing) => ({ ...ing, selected: true })));
+      const listNames = currentList.items.map((i) => i.name.toLowerCase());
+      setRows(ingredients.map((ing) => {
+        const inList = alreadyInList(ing.name, listNames);
+        return { ...ing, selected: !inList, inList };
+      }));
     } catch (e: any) {
       setError(e.message ?? 'Hata oluştu');
     } finally {
@@ -145,6 +155,11 @@ export default function CookScreen() {
                     {row.quantity} {row.unit}
                   </Text>
                 </View>
+                {row.inList && (
+                  <View style={styles.inListBadge}>
+                    <Text style={styles.inListText}>Listede var</Text>
+                  </View>
+                )}
               </TouchableOpacity>
             ))}
 
@@ -214,4 +229,7 @@ const styles = StyleSheet.create({
 
   successRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4 },
   successText: { color: '#4ade80', fontSize: 15, fontWeight: '600' },
+
+  inListBadge: { backgroundColor: '#1e293b', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  inListText: { color: '#3b82f6', fontSize: 11 },
 });
