@@ -14,6 +14,10 @@ import {
   ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from "expo-speech-recognition";
 import { useListStore } from "../../src/stores/listStore";
 import { ListItem, ProductInfo } from "../../src/types";
 
@@ -60,6 +64,33 @@ async function fetchProductInfo(itemName: string): Promise<ProductInfo> {
 
 export default function HomeScreen() {
   const [isFocused, setIsFocused] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+
+  useSpeechRecognitionEvent("result", (e) => {
+    const text = e.results[0]?.transcript ?? "";
+    if (text) {
+      setInputText(text);
+      if (e.isFinal) {
+        setIsListening(false);
+        ExpoSpeechRecognitionModule.stop();
+      }
+    }
+  });
+
+  useSpeechRecognitionEvent("end", () => setIsListening(false));
+  useSpeechRecognitionEvent("error", () => setIsListening(false));
+
+  const toggleListening = async () => {
+    if (isListening) {
+      ExpoSpeechRecognitionModule.stop();
+      return;
+    }
+    const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+    if (!granted) return;
+    setInputText("");
+    setIsListening(true);
+    ExpoSpeechRecognitionModule.start({ lang: "tr-TR", interimResults: true });
+  };
   const {
     currentList,
     addItem,
@@ -319,8 +350,11 @@ export default function HomeScreen() {
             <Ionicons name="arrow-up" size={18} color="#000" />
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={styles.micBtn}>
-            <Ionicons name="mic" size={18} color="#000" />
+          <TouchableOpacity
+            style={[styles.micBtn, isListening && styles.micBtnActive]}
+            onPress={toggleListening}
+          >
+            <Ionicons name={isListening ? "stop" : "mic"} size={18} color="#000" />
           </TouchableOpacity>
         )}
       </View>
@@ -498,6 +532,7 @@ const styles = StyleSheet.create({
     borderColor: "#222",
   },
   addInput: { flex: 1, color: "#e5e5e5", fontSize: 15 },
+  micBtnActive: { backgroundColor: "#ef4444" },
   micBtn: {
     width: 34,
     height: 34,
