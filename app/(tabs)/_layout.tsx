@@ -31,10 +31,17 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="history"
+        name="cook"
         options={{
-          title: 'Geçmiş',
-          tabBarIcon: ({ color, size }) => <Ionicons name="time-outline" size={size} color={color} />,
+          title: 'Tarif',
+          tabBarIcon: ({ color, size }) => <Ionicons name="restaurant-outline" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="preferences"
+        options={{
+          title: 'Tercihler',
+          tabBarIcon: ({ color, size }) => <Ionicons name="options-outline" size={size} color={color} />,
         }}
       />
     </Tabs>

@@ -1,4 +1,4 @@
-import { ProductInfo } from '../types';
+import { ProductInfo, RecipeIngredient } from '../types';
 
 const API_URL = (key: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
@@ -145,6 +145,19 @@ export async function fetchCategory(itemName: string): Promise<string> {
   const category = match ?? 'Genel';
   categoryCache.set(key, category);
   return category;
+}
+
+export async function fetchRecipeIngredients(mealName: string): Promise<RecipeIngredient[]> {
+  const text = await callGemini(
+    `"${mealName}" yemeği için Türkiye mutfağında tipik olarak kullanılan malzeme listesini oluştur. 4 kişilik porsiyon. Sadece şu JSON formatında döndür, başka hiçbir şey yazma: {"ingredients":[{"name":"malzeme adı","quantity":2,"unit":"adet"}]}. Birimler için şunları kullan: adet, kg, gr, lt, ml, yemek kaşığı, tatlı kaşığı, çay kaşığı, su bardağı, demet, diş, tutam.`
+  );
+
+  const codeBlock = text.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+  const jsonStr = codeBlock ? codeBlock[1] : text.match(/\{[\s\S]*\}/)?.[0];
+  if (!jsonStr) throw new Error('Geçersiz API cevabı');
+
+  const parsed = JSON.parse(jsonStr);
+  return parsed.ingredients as RecipeIngredient[];
 }
 
 export async function fetchProductInfo(itemName: string): Promise<ProductInfo> {

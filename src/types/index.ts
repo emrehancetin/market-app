@@ -22,3 +22,15 @@ export interface ShoppingList {
   createdAt: string;
   items: ListItem[];
 }
+
+export interface RecipeIngredient {
+  name: string;
+  quantity: number;
+  unit: string;
+  filteredReason?: 'neverUse' | 'alwaysHave';
+}
+
+export interface UserPreferences {
+  neverUse: string[];
+  alwaysHave: string[];
+}

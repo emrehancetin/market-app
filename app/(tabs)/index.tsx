@@ -59,7 +59,6 @@ export default function HomeScreen() {
     updateNote,
     setProductInfo,
     setCategory,
-    saveCurrentList,
   } = useListStore();
   const [inputText, setInputText] = useState("");
   const [selectedItem, setSelectedItem] = useState<ListItem | null>(null);
@@ -128,11 +127,6 @@ export default function HomeScreen() {
     const units = ["kg", "gr", "g", "lt", "ml", "adet", "paket", "şişe", "kutu", "demet", "tane"];
     const unitPattern = units.join("|");
 
-    // "2kg elma", "2 kg elma", "elma 2kg", "elma 2 kg" hepsini yakala
-    const regex = new RegExp(
-      `^(?:(\\d+(?:[.,]\\d+)?)\\s*(${unitPattern})?\\s+)?(.+?)(?:\\s+(\\d+(?:[.,]\\d+)?)\\s*(${unitPattern})?)?$`,
-      "i",
-    );
 
     let name = text;
     let quantity = 1;
@@ -202,12 +196,6 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <Text style={styles.title}>{currentList.name}</Text>
-          {totalCount > 0 && (
-            <TouchableOpacity style={styles.saveBtn} onPress={saveCurrentList}>
-              <Ionicons name="archive-outline" size={16} color="#000" />
-              <Text style={styles.saveBtnText}>Save</Text>
-            </TouchableOpacity>
-          )}
         </View>
         <Text style={styles.subtitle}>
           {totalCount === 0
