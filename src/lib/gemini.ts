@@ -1,7 +1,7 @@
 import { ProductInfo, RecipeIngredient } from '../types';
 
 const API_URL = (key: string) =>
-  `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+  `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${key}`;
 
 const CONFIG = { maxOutputTokens: 512, thinkingConfig: { thinkingBudget: 0 } };
 
